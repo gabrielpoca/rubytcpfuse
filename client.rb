@@ -213,6 +213,7 @@ class MyFuse
 
   def rmdir(ctx,path)
     @root.remove_obj(path)
+    @client.rmdir path
   end
 
   #def symlink(ctx,path,as)
@@ -329,11 +330,14 @@ end #class Fuse
 
 class MyClient
 
-  def initialize path, fuse
-    @fuse = fuse
+  def initialize path
     @path = path
     @client = TCPSocket.open 'localhost', 3000
     @log = Logger.new STDOUT
+  end
+
+  def set_fuse fuse
+    @fuse = fuse
   end
 
   def close
@@ -376,8 +380,8 @@ class MyClient
     #self.send_obj ["write", path, buf, offset]
   end
 
-  def ls
-
+  def rmdir path
+    self.send_obj ["rmdir", path]
   end
 
   def send_obj obj
@@ -403,10 +407,13 @@ if ARGV.length == 0
   exit(1)
 end
 
+@client = MyClient.new ARGV[0]
+
 fs = MyFuse.new(MyDir.new("",0777), @client)
+@client.set_fuse fs
+
 fo = RFuse::FuseDelegator.new(fs,*ARGV)
 
-@client = MyClient.new ARGV[0], fs
 @client.sync
 
 if fo.mounted?

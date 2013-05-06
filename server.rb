@@ -68,9 +68,11 @@ class MyServer
                 client.write YAML::dump self.get_folders
                 client.write YAML::dump self.get_files
               when 'mkdir'
-                self.mkdir arguments[1], arguments[2]
+                self.mkdir @path+arguments[1], arguments[2]
               when 'mknod'
-                self.mknod arguments[1], arguments[2], arguments[3]
+                self.mknod arguments[1], @path+arguments[2], arguments[3]
+              when 'rmdir'
+                self.rmdir @path+arguments[1]
               end
             end
           rescue Exception => e
@@ -85,10 +87,14 @@ class MyServer
     end
   end
 
+  def rmdir path
+    FileUtils.remove_dir path
+  end
+
   def mknod ctx, path, mode
     begin
-      @log.info "Mknod "+@path+path
-      @files.push MyFile.new ctx.uid, ctx.gid, ctx.pid, @path+path, mode
+      @log.info "Mknod "+path
+      @files.push MyFile.new ctx.uid, ctx.gid, ctx.pid, path, mode
     rescue Exception => e
       Thread.main.raise e
     end
@@ -97,7 +103,7 @@ class MyServer
 
   def mkdir path, mode
     begin
-      @log.info "Mkdir "+@path+path
+      @log.info "Mkdir "+path
       FileUtils.mkdir_p @path+path
     rescue Exception => e
       print e
