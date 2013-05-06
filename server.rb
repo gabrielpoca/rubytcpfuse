@@ -73,6 +73,8 @@ class MyServer
                 self.mknod arguments[1], @path+arguments[2], arguments[3]
               when 'rmdir'
                 self.rmdir @path+arguments[1]
+              when 'write'
+                self.write @path+arguments[1], arguments[2]
               end
             end
           rescue Exception => e
@@ -85,6 +87,11 @@ class MyServer
     rescue Exception => e
       Thread.main.raise e
     end
+  end
+
+  def write path, content
+    FileUtils.remove_file path
+    File.open(path, "w") {|f| f.write content}
   end
 
   def rmdir path

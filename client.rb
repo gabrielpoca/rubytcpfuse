@@ -244,6 +244,7 @@ class MyFuse
       raise Errno::EISDIR.new(path)
     else
       d.content[offset..offset+buf.length - 1] = buf
+      @client.write path, d.content
       #@client.write ctx, path, buf, offset, fi
     end
     return buf.length
@@ -369,9 +370,9 @@ class MyClient
     self.send_obj ["mkdir", path, mode]
   end
 
-  def write ctx, path, buf, offset, fi
+  def write path, content
     puts "Write called"
-    #self.send_obj ["write", path, buf, offset]
+    self.send_obj ["write", path, content]
   end
 
   def rmdir path
