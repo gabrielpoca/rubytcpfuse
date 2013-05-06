@@ -244,12 +244,13 @@ class MyFuse
       raise Errno::EISDIR.new(path)
     else
       d.content[offset..offset+buf.length - 1] = buf
-      @client.write ctx, path, buf, offset, fi
+      #@client.write ctx, path, buf, offset, fi
     end
     return buf.length
   end
 
-  def setxattr(ctx,path,name,value,size,flags)
+  # removed name
+  def setxattr(ctx,path,name,value,flags)
     d=@root.search(path)
     d.setxattr(name,value,flags)
   end
@@ -356,13 +357,6 @@ class MyClient
     files.each do |file|
       @fuse.mknod_sync file[:path], file[:mode], file[:uid], file[:gid]
     end
-  end
-
-  def getattr ctx, path
-    #@client.puts "getattr"
-    #@client.puts YAML::dump path
-    #d = YAML::load @client.gets
-    return d
   end
 
   def mknod(ctx,path,mode,major,minor)
