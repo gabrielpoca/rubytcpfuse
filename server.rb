@@ -47,10 +47,11 @@ class MyServer
           path: c.to_s.sub('server', ''), 
           mode: c.stat.mode,
           uid: 0, 
-          gid: 0
+          gid: 0,
+          content: c.read
         })
       end
-    end #.collect{ |p| p.to_s }
+    end
     files
   end
 
@@ -59,7 +60,6 @@ class MyServer
       loop do
         Thread.start(@server.accept) do |client|
           @log.info "Connection accepted"
-
           begin
             while (arguments = YAML::load client.recv(5000))
               @log.info "Received: "+arguments.inspect
@@ -81,7 +81,6 @@ class MyServer
             Thread.main.raise e
           end
           @log.info "Connection closed"
-
         end
       end
     rescue Exception => e
@@ -96,16 +95,6 @@ class MyServer
 
   def rmdir path
     FileUtils.remove_dir path
-  end
-
-  def mknod ctx, path, mode
-    begin
-      @log.info "Mknod "+path
-      @files.push MyFile.new ctx.uid, ctx.gid, ctx.pid, path, mode
-    rescue Exception => e
-      Thread.main.raise e
-    end
-
   end
 
   def mkdir path, mode

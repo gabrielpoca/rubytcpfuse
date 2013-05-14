@@ -173,7 +173,6 @@ class MyFuse
 
   def mknod(ctx,path,mode,major,minor)
     @root.insert_obj(MyFile.new(File.basename(path),mode,ctx.uid,ctx.gid),path)
-    @client.mknod(ctx,path,mode,major,minor)
   end #mknod
 
   def open(ctx,path,ffi)
@@ -235,6 +234,15 @@ class MyFuse
       return nil
     else
       return d.content[offset..offset + size - 1]
+    end
+  end
+
+  def write_sync path, content
+    d=@root.search(path)
+    if (d.isdir) 
+      raise Errno::EISDIR.new(path)
+    else
+      d.content = content
     end
   end
 
@@ -349,20 +357,24 @@ class MyClient
   def sync
     self.send_obj ["sync"]
     folders = YAML::load @client.recv 50000
-    @log.info "Received "+folders.inspect
+    @log.debug "Received "+folders.inspect
     folders.each do |folder|
       @fuse.mkdir_sync folder[:path], folder[:mode]
     end
-    files = YAML::load @client.recv 50000
+    #num_files = YAML::load @client.recv 5000
+    #@log.debug "Receiving #{num_files} files"
+    #num_files.to_i.times do
+    #file = YAML::load @client.recv(500000)
+    #@log.debug "Received "+file.inspect
+    #@fuse.mknod_sync file[:path], file[:mode], file[:uid], file[:gid]
+    #@fuse.write_sync file[:path], file[:content]
+    #end
+    files = YAML::load @client.recv 5000000
     @log.info "Received "+files.inspect
     files.each do |file|
       @fuse.mknod_sync file[:path], file[:mode], file[:uid], file[:gid]
+      @fuse.write_sync file[:path], file[:content]
     end
-  end
-
-  def mknod(ctx,path,mode,major,minor)
-    @log.info 'mknod'
-    self.send_obj ["mknod", ctx, path, mode, major, minor]
   end
 
   def mkdir ctx, path, mode
