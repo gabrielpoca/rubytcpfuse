@@ -2,11 +2,16 @@
 
 # TestFS for RFuse
 
-require "rfuse"
+require 'thread'
+require 'rfuse'
 require 'socket'
 require 'pry'
 require 'pry-debugger'
 require  'logger'
+
+require_relative 'my_client'
+require_relative 'database'
+require_relative 'message'
 
 class MyDir < Hash
   attr_accessor :name, :mode , :actime, :modtime, :uid, :gid
@@ -338,69 +343,6 @@ class MyFuse
 
 end #class Fuse
 
-class MyClient
-
-  def initialize path
-    @path = path
-    @client = TCPSocket.open 'localhost', 3000
-    @log = Logger.new STDOUT
-  end
-
-  def set_fuse fuse
-    @fuse = fuse
-  end
-
-  def close
-    @client.close
-  end
-
-  def sync
-    self.send_obj ["sync"]
-    folders = YAML::load @client.recv 50000
-    @log.debug "Received "+folders.inspect
-    folders.each do |folder|
-      @fuse.mkdir_sync folder[:path], folder[:mode]
-    end
-    #num_files = YAML::load @client.recv 5000
-    #@log.debug "Receiving #{num_files} files"
-    #num_files.to_i.times do
-    #file = YAML::load @client.recv(500000)
-    #@log.debug "Received "+file.inspect
-    #@fuse.mknod_sync file[:path], file[:mode], file[:uid], file[:gid]
-    #@fuse.write_sync file[:path], file[:content]
-    #end
-    files = YAML::load @client.recv 5000000
-    @log.info "Received "+files.inspect
-    files.each do |file|
-      @fuse.mknod_sync file[:path], file[:mode], file[:uid], file[:gid]
-      @fuse.write_sync file[:path], file[:content]
-    end
-  end
-
-  def mkdir ctx, path, mode
-    @log.info 'mkdir'
-    self.send_obj ["mkdir", path, mode]
-  end
-
-  def write path, content
-    puts "Write called"
-    self.send_obj ["write", path, content]
-  end
-
-  def rmdir path
-    self.send_obj ["rmdir", path]
-  end
-
-  def send_obj obj
-    @client.write YAML::dump obj
-  end
-
-  def recv_obj
-    YAML::load @client.recv(5000)
-  end
-end
-
-
 if ARGV.length == 0
   print "\n"
   print "Usage: [ruby [--debug]] #{$0} mountpoint [mount_options...]\n"
@@ -421,15 +363,43 @@ fs = MyFuse.new(MyDir.new("",0777), @client)
 
 fo = RFuse::FuseDelegator.new(fs,*ARGV)
 
-@client.sync
+client_thread = Thread.new do
+  loop do
+    until @client.connect do
+      sleep 4
+    end
+    print "Connection established"
+    begin
+      loop do
+        @client.wait
+        #puts Message.first.message
+        binding.pry
+      end
+    rescue
+      print "Error: #{$!}"
+    end
+  end
+end
 
 if fo.mounted?
-  Signal.trap("TERM") { print "Caught TERM\n" ; fo.exit; @client.close; exit }
-  Signal.trap("INT") { print "Caught INT\n"; fo.exit; @client.close; exit }
+  Signal.trap("TERM") do
+    print "Caught TERM\n" ; 
+    fo.exit; 
+    @client.close; 
+    client_thread.exit; 
+    exit 
+  end
+  Signal.trap("INT") do 
+    print "Caught INT\n"; 
+    fo.exit; 
+    @client.close; 
+    client_thread.exit;
+    exit 
+  end
   begin
     fo.loop
   rescue
-    print "Error:" + $!
+    print "Error: #{$!}"
   ensure
     fo.unmount if fo.mounted?
     print "Unmounted #{ARGV[0]}\n"

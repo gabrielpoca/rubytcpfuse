@@ -1,2 +1,3 @@
-client/*
-server/*
+client/test/*
+client/*.db
+server/test/*
